@@ -1,0 +1,938 @@
+\documentclass[11pt,a4paper]{report}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{float}
+\usepackage{enumitem}
+% NOTE: natbib supprimé car on utilise thebibliography inline
+\geometry{margin=2.5cm}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+  citecolor=blue
+}
+
+\lstdefinestyle{matlabstyle}{
+  language=Matlab,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue!70!black},
+  commentstyle=\color{green!40!black},
+  stringstyle=\color{orange!60!black},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  stepnumber=1,
+  frame=single,
+  breaklines=true,
+  tabsize=2,
+  showstringspaces=false
+}
+
+\newtheorem{theorem}{Theoreme}[chapter]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemme}
+
+\title{Analyse et simulation numerique de l'equation de Nagumo\\
+\large Etude theorique, schemas numeriques et stabilite}
+\author{Mawounan Jolemon GLODJO}
+\date{22 avril 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Ce rapport presente une etude complete de l'equation de Nagumo en dimension un,
+modele reaction-diffusion bistable apparaissant en neurobiologie, en ecologie et dans
+l'etude des fronts de propagation.
+Nous commencons par la modelisation mathematique, l'analyse des equilibres, l'existence
+de fronts voyageurs et la vitesse analytique associee.
+Nous derivons ensuite plusieurs methodes de discretisation en temps et en espace:
+Runge-Kutta d'ordre 4, Euler implicite, Adams-Bashforth d'ordre 2 et Adams-Moulton d'ordre 2.
+L'analyse de stabilite est menee au niveau lineaire puis par une etude de Von Neumann,
+afin de mettre en evidence les contraintes CFL et les differences entre schemas explicites
+et implicites.
+Enfin, une base de simulation MATLAB est fournie pour comparer les schemas, suivre la
+propagation du front, verifier la convergence et visualiser les resultats.
+\end{abstract}
+
+\tableofcontents
+
+\chapter*{Preambule -- Mise en contexte}
+\addcontentsline{toc}{chapter}{Preambule -- Mise en contexte}
+L'equation de Nagumo a ete introduite \cite{Nagumo1962} comme modele simple mais riche pour decrire la
+propagation d'un signal dans un milieu bistable. Elle intervient dans des problemes de
+migration cellulaire \cite{MurrayMathematicalBiology}, d'activation neuronale, de dynamique des populations et plus
+largement dans les phenomenes de front de reaction-diffusion \cite{Volpert2000}.
+
+L'interet principal de ce modele est qu'il combine trois ingredients fondamentaux:
+la diffusion, qui regularise l'espace; la reaction locale, qui cree plusieurs etats
+stables; et l'effet de seuil, qui determine la direction et la vitesse de propagation.
+
+Le present rapport a pour objectif de construire une etude mathematique propre et une
+chaine numerique complete. L'accent est mis sur la derivation des schemas, leur domaine
+de stabilite, et leur comportement en simulation.
+
+\chapter{Partie I -- Analyse theorique}
+\section{Formulation mathematique}
+On considere l'equation de Nagumo sur un domaine unidimensionnel $\Omega=[0,L]$:
+\begin{equation}
+\frac{\partial u}{\partial t} = D\,\Delta u + u(1-u)(u-a), \qquad x \in \Omega,\; t>0,
+\end{equation}
+ou, en dimension un,
+\begin{equation}
+\frac{\partial u}{\partial t} = D\,\frac{\partial^2 u}{\partial x^2} + u(1-u)(u-a).
+\end{equation}
+Ici $u(x,t)$ represente un etat d'activation, $D>0$ est le coefficient de diffusion
+et $a \in (0,1)$ est un parametre de seuil.
+
+On impose une condition initiale $u(x,0)=u_0(x)$ ainsi que des conditions aux bords
+choisies selon le contexte. Dans ce rapport, on retient des conditions de Neumann
+homogenes:
+\begin{equation}
+\partial_x u(0,t)=0, \qquad \partial_x u(L,t)=0,
+\end{equation}
+qui correspondent a un milieu isole sans flux de matiere aux extremites.
+
+\section{Points d'equilibre et analyse qualitative}
+On note
+\begin{equation}
+ f(u)=u(1-u)(u-a).
+\end{equation}
+Les points d'equilibre homogenes sont les racines de $f$, soit
+\begin{equation}
+ u^* \in \{0,a,1\}.
+\end{equation}
+Pour l'ODE associee sans diffusion, $\dot u=f(u)$, on a
+\begin{equation}
+ f'(u) = -3u^2 + 2(1+a)u - a.
+\end{equation}
+D'ou
+\begin{equation}
+ f'(0)=-a<0, \qquad f'(a)=a(1-a)>0, \qquad f'(1)=a-1<0.
+\end{equation}
+Ainsi $u=0$ et $u=1$ sont localement stables, tandis que $u=a$ est instable.
+
+La fonction de reaction est bistable: elle pousse la solution vers l'un des deux etats
+stables selon que l'etat initial se situe au-dessus ou en dessous du seuil.
+Cette structure est typique des systemes a changement de phase ou a propagation de front.
+
+\subsection*{Portrait de phase de l'EDO locale}
+Sans diffusion, l'equation devient $\dot u=f(u)$.
+Le signe de $f$ permet de lire le sens d'evolution:
+\begin{itemize}[leftmargin=1.5em]
+  \item si $0<u<a$, alors $f(u)<0$ et la solution decroit vers 0;
+  \item si $a<u<1$, alors $f(u)>0$ et la solution cro\^{\i}t vers 1;
+  \item au voisinage de $u=a$, la dynamique est repulsive.
+\end{itemize}
+Ce portrait de phase explique la coexistence de deux phases stables et d'un seuil de bascule.
+
+\section{Solutions en fronts voyageurs : approche théorique}
+\subsection*{Motivation et justification}
+L'une des caractéristiques remarquables de l'équation de Nagumo en régime bistable
+est l'existence de \textbf{solutions de type fronts voyageurs}, appelées aussi \textit{ondes progressives}.
+Ces solutions représentent des transitions stables entre deux états d'équilibre qui se propagent
+à vitesse constante dans l'espace.
+
+\textbf{Pourquoi chercher de telles solutions?}
+\begin{enumerate}[leftmargin=2em]
+  \item Les fronts voyageurs sont des \textit{structures cohérentes} qui émergent naturellement
+        des équations de réaction-diffusion bistables.
+  \item Elles représentent des \textit{attracteurs globaux}: de nombreuses conditions initiales
+        convergent vers ce type de comportement asymptotique.
+  \item Elles sont \textit{observées expérimentalement} dans les systèmes biologiques
+        (ondes nerveuses, fronts enzymatiques, etc.).
+\end{enumerate}
+
+\subsection*{Construction de l'équation pour les fronts voyageurs}
+On cherche des solutions de la forme:
+\begin{equation}
+ u(x,t) = \phi(\xi), \qquad \xi = x - ct,
+\end{equation}
+où $c$ est la vitesse du front (à déterminer) et $\phi(\xi)$ est le profil spatial.
+Cette approche transforme l'équation aux dérivées partielles en une équation différentielle ordinaire.
+
+\textbf{Dérivation des relations de dérivation:}
+En utilisant la règle de chaîne,
+\begin{align}
+ \frac{\partial u}{\partial t} &= \frac{d\phi}{d\xi} \cdot \frac{d\xi}{dt} = -c \phi'(\xi), \\
+ \frac{\partial u}{\partial x} &= \phi'(\xi), \quad \frac{\partial^2 u}{\partial x^2} = \phi''(\xi).
+\end{align}
+
+\textbf{Substitution dans l'équation de Nagumo:}
+En remplaçant ces dérivées dans
+\begin{equation}
+ \frac{\partial u}{\partial t} = D \frac{\partial^2 u}{\partial x^2} + f(u),
+\end{equation}
+on obtient:
+\begin{equation}
+ -c\phi'(\xi) = D\phi''(\xi) + \phi(\xi)(1-\phi(\xi))(\phi(\xi)-a),
+\end{equation}
+
+soit:
+\begin{equation}\boxed{
+ D\phi'' + c\phi' + f(\phi) = 0, \qquad \text{où } f(\phi)=\phi(1-\phi)(\phi-a).
+}
+\end{equation}
+
+\subsection*{Conditions asymptotiques et connectivité}
+Pour que le front connecte deux états stables de manière physiquement pertinente,
+on impose les \textbf{conditions asymptotiques}:
+\begin{equation}
+ \phi(-\infty) = 1, \qquad \phi(+\infty) = 0.
+\end{equation}
+
+Ces conditions signifient que:
+\begin{itemize}[leftmargin=1.5em]
+  \item Loin derrière le front ($\xi \to -\infty$), la solution vaut 1 (état "élevé" stable).
+  \item Loin devant le front ($\xi \to +\infty$), la solution vaut 0 (état "bas" stable).
+  \item Le front assure une transition continue et monotone (ou oscillatoire amortie) entre ces deux états.
+\end{itemize}
+
+\textbf{Remarque sur les vitesses:} Toute vitesse $c$ n'est pas admissible. 
+Il existe une \textbf{unique vitesse minimale} $c^*$ pour laquelle existe un profil $\phi$ vérifiant
+les conditions asymptotiques et reste entre 0 et 1. C'est un résultat profond de la théorie
+des équations de réaction-diffusion bistables (voir e.g., \cite{FifeMcLeod1977}).
+
+\subsection*{Existence et unicité du profil}
+\begin{theorem}[Existence et unicité du front]
+Pour l'équation de Nagumo avec $0 < a < 1$ et $D > 0$, il existe une unique
+vitesse critique
+\begin{equation}
+ c^* = \sqrt{2D}\left(\frac{1}{2} - a\right)
+\end{equation}
+et un unique profil (à translation) $\phi_*(\xi)$ tel que:
+\begin{enumerate}[leftmargin=1.5em]
+  \item $\phi_*$ satisfait $D\phi_*'' + c^*\phi_*' + f(\phi_*) = 0$;
+  \item $\phi_*(-\infty)=1$, $\phi_*(+\infty)=0$;
+  \item $0 < \phi_*(\xi) < 1$ pour tout $\xi \in \mathbb{R}$;
+  \item $\phi_*$ décroît monotonement (profil régulier sans oscillations).
+\end{enumerate}
+\end{theorem}
+
+\textbf{Observations:}
+\begin{itemize}[leftmargin=1.5em]
+  \item Si $a < \tfrac{1}{2}$, alors $c^* > 0$ : le front progresse vers la droite (de 1 vers 0).
+  \item Si $a > \tfrac{1}{2}$, alors $c^* < 0$ : le front se propage vers la gauche.
+  \item Si $a = \tfrac{1}{2}$, alors $c^* = 0$ : le front devient stationnaire.
+  \item La vitesse dépend de $D$ et $a$ uniquement, pas de conditions initiales (propriété remarquable).
+\end{itemize}
+
+\subsection*{Forme explicite du profil}
+Une approximation classique du profil de front est
+\begin{equation}
+ \phi(\xi) = \frac{1}{1 + e^{\xi/\sqrt{2D}}}.
+\end{equation}
+
+\textbf{Vérification:}
+On peut vérifier (par calcul) que ce profil satisfait:
+\begin{itemize}[leftmargin=1.5em]
+  \item $\phi(-\infty) \to 1$ et $\phi(+\infty) \to 0$.
+  \item $\phi''(\xi) = -\frac{1}{2D}\phi'(\xi)(1-2\phi(\xi))$.
+  \item Lorsque substitué dans l'équation du front, il donne une approximation de très bonne qualité.
+\end{itemize}
+
+\textbf{Interprétation:} Le profil est une fonction logistique (courbe en S inversée) 
+de largeur caractéristique $\sqrt{2D}$. Plus la diffusion est forte, plus le front s'étale.
+
+\subsection*{Stabilité orbitale du front}
+Un résultat central est que les fronts voyageurs sont \textbf{orbitalement stables}.
+Cela signifie que si on perturbe légèrement la condition initiale autour du profil du front,
+la solution reste proche de ce profil et se propage à une vitesse proche de $c^*$.
+Cette stabilité est essentielle pour justifier l'observation des fronts en simulations numériques.
+
+\section{Regularite, borne et existence de solutions globales}
+Au-delà des solutions de fronts voyageurs, on s'intéresse aux propriétés générales des solutions.
+
+\subsection*{Existence et unicité}
+Dans un cadre classique (Sobolev ou Hölder), la diffusion et la continuité de $f$ permettent d'obtenir une
+\textbf{existence locale} de solution faible ou classique selon la régularité de $u_0$ \cite{EvansGariepy2015}.
+Pour une donnée initiale $u_0 \in L^\infty(\Omega)$, il existe $T_* > 0$ tel qu'existe une unique solution
+faible en temps court $[0, T_*]$.
+
+\subsection*{Principe du maximum et bornitude globale}
+La propriété cruciale est le \textbf{principe du maximum} \cite{FifeMcLeod1977}:
+Si $u_0(x) \in [0,1]$, alors la solution $u(x,t) \in [0,1]$ pour tout $t \geq 0$ et $x \in \Omega$.
+
+\textbf{Conséquences:}
+\begin{enumerate}[leftmargin=2em]
+  \item La bornitude a priori permet de \textbf{prolonger la solution à tout temps} $t \in [0,\infty)$.
+  \item La solution reste confinée dans une région admissible $([\![0,1]\!])$ physiquement pertinente.
+  \item Cette propriété est fondamentale pour la stabilité des schémas numériques.
+\end{enumerate}
+
+\subsection*{Importance pour les simulations numériques}
+Numériquement, le principe du maximum est critial:
+\begin{itemize}[leftmargin=1.5em]
+  \item Un schéma \textbf{qui viole le principe du maximum} produit des oscillations parasites
+        et des dépassements non physiques (overshoot) hors de $[0,1]$.
+  \item Les schémas \textbf{préservant le maximum} (monotones ou antidiffusifs) conservent
+        les propriétés physiques même sur maillages grossiers.
+  \item Cette borne assure aussi la convergence de critères d'arrêt pour les solveurs implicites.
+\end{itemize}
+
+\chapter{Partie II -- Analyse numerique}
+L'analyse numerique des equations de reaction-diffusion necessite une discretisation spatiale
+et temporelle \cite{Strikwerda2004,LeVeque2007}. Nous presentons plusieurs schemas explicites
+et implicites.
+
+\section{Mise en place de la discretisation}
+On introduit une grille spatiale reguliere
+\begin{equation}
+ x_i=i\Delta x, \qquad i=0,\ldots,N,
+\end{equation}
+et une grille temporelle
+\begin{equation}
+ t^n=n\Delta t, \qquad n\ge 0.
+\end{equation}
+On note $u_i^n \approx u(x_i,t^n)$.
+
+Le Laplacien est approxime par differences finies centrees:
+\begin{equation}
+ \Delta u(x_i,t^n) \approx \frac{u_{i+1}^n-2u_i^n+u_{i-1}^n}{(\Delta x)^2}.
+\end{equation}
+Sous conditions de Neumann homogenes, on peut utiliser des points fantomes:
+\begin{equation}
+ u_{-1}^n=u_1^n, \qquad u_{N+1}^n=u_{N-1}^n.
+\end{equation}
+
+On definit aussi
+\begin{equation}
+ F_i^n = D\,\Delta_h u_i^n + f(u_i^n),
+\end{equation}
+ou $\Delta_h$ designe le Laplacien discret.
+
+\section{Methode 1 : Runge-Kutta d'ordre 4}
+La methode de Runge-Kutta d'ordre 4 (RK4) est construite a partir d'une formule de quadrature
+numerique. Elle resout l'equation differentielle ordinaire
+\begin{equation}
+\frac{du}{dt} = G(u,t)
+\end{equation}
+par une combinaison ponderee de termes evalues a differents points.
+
+\subsection*{Derivation et formule}
+Considerons le probleme initial:
+\begin{equation}
+\frac{du}{dt} = D\,\Delta_h u + f(u), \qquad u(t^n)=U^n.
+\end{equation}
+On approche l'integrale exacte
+\begin{equation}
+u(t^{n+1})=u(t^n) + \int_{t^n}^{t^{n+1}} G(u(t)) dt
+\end{equation}
+par une formule de Simpson (quadrature a 4 points). La methode RK4 utilise les
+evaluations successives du second membre a 4 etapes:
+
+\textbf{Etape 1:} evaluer $G$ a $t^n$:
+\begin{equation}
+ K_1 = G(U^n).
+\end{equation}
+
+\textbf{Etape 2:} evaluer $G$ en un point intermediaire $t^n + \frac{\Delta t}{2}$:
+\begin{equation}
+ K_2 = G\left(U^n + \frac{\Delta t}{2}K_1\right).
+\end{equation}
+
+\textbf{Etape 3:} evaluer $G$ a nouveau en $t^n + \frac{\Delta t}{2}$, mais avec une meilleure prediction:
+\begin{equation}
+ K_3 = G\left(U^n + \frac{\Delta t}{2}K_2\right).
+\end{equation}
+
+\textbf{Etape 4:} evaluer $G$ au point final $t^{n+1}$:
+\begin{equation}
+ K_4 = G\left(U^n + \Delta t\, K_3\right).
+\end{equation}
+
+La solution au temps $t^{n+1}$ est approximee par:
+\begin{equation}
+ U^{n+1} = U^n + \frac{\Delta t}{6}(K_1 + 2K_2 + 2K_3 + K_4).
+\end{equation}
+
+\subsection*{Application a l'equation de Nagumo discretisee}
+Dans notre contexte avec discretisation spatiale, on pose $G(U)=AU+F(U)$ ou
+$A$ est la matrice du Laplacien et $F$ represente la reaction nonlineaire.
+
+Le schema RK4 devient:
+\begin{align}
+ K_1 &= AU^n + F(U^n), \\
+ K_2 &= A\left(U^n + \frac{\Delta t}{2}K_1\right) + F\left(U^n + \frac{\Delta t}{2}K_1\right), \\
+ K_3 &= A\left(U^n + \frac{\Delta t}{2}K_2\right) + F\left(U^n + \frac{\Delta t}{2}K_2\right), \\
+ K_4 &= A\left(U^n + \Delta t\, K_3\right) + F\left(U^n + \Delta t\, K_3\right),
+\end{align}
+
+et la mise a jour:
+\begin{equation}
+ U^{n+1} = U^n + \frac{\Delta t}{6}(K_1 + 2K_2 + 2K_3 + K_4).
+\end{equation}
+
+\subsection*{Proprietes et ordre de convergence}
+La methode RK4 possede les caracteristiques suivantes:
+
+\textbf{Ordre temporel:} L'erreur locale de troncature est $O((\Delta t)^5)$, d'ou un ordre
+global de convergence de \textbf{4}. C'est un progres majeur par rapport aux schemas
+d'ordre 1 (Euler).
+
+\textbf{Stabilite:} Le schema reste conditionnellement stable, mais le domaine de stabilite
+(region de stabilite dans le plan complexe) est plus grand que celui d'Euler. C'est un avantage
+La condition CFL pratique pour RK4 est moins restrictive que pour Euler, permettant des
+pas de temps plus grands a maillage egal.
+
+\textbf{Cout par pas:} Chaque iteration RK4 demande 4 evaluations de $G$, soit environ 4 fois
+le cout d'Euler explicite par pas. Cependant, l'ordre 4 compense souvent ce surco\^{u}t en
+permettant des pas plus grands et en reduisant le nombre total d'iterations.
+
+\subsection*{Avantages et inconvenients}
+\begin{itemize}[leftmargin=1.5em]
+  \item \textbf{Avantages:}
+    \begin{itemize}[leftmargin=1.5em]
+      \item ordre 4 en temps $\Rightarrow$ bonne precision pour pas de temps moderes;
+      \item stabilite meilleure qu'un schema explicite simple (Euler);
+      \item methode classique et bien comprise;
+      \item excellente methode de reference pour comparaisons numeriques.
+    \end{itemize}
+  \item \textbf{Inconvenients:}
+    \begin{itemize}[leftmargin=1.5em]
+      \item encore conditionnellement stable (CFL necessite);
+      \item cout de 4 evaluations par pas;
+      \item moins robuste qu'un schema implicite pour tres long terme.
+    \end{itemize}
+\end{itemize}
+
+\section{Methode 2 : Euler implicite}
+Le schema implicite est
+\begin{equation}
+\frac{u_i^{n+1}-u_i^n}{\Delta t} = D\frac{u_{i+1}^{n+1}-2u_i^{n+1}+u_{i-1}^{n+1}}{(\Delta x)^2} + f(u_i^{n+1}).
+\end{equation}
+Il necessite la resolution d'un systeme non lineaire a chaque pas.
+En pratique, on peut utiliser:
+\begin{itemize}[leftmargin=1.5em]
+  \item Newton ou quasi-Newton;
+  \item une linearisation de $f$;
+  \item un traitement semi-implicite du terme non lineaire.
+\end{itemize}
+
+Son interet est sa robustesse: la partie diffusive est traitee de facon inconditionnellement
+stable. C'est souvent la methode de reference quand le maillage devient fin.
+
+\section{Methode 3 : Adams-Bashforth 2}
+Le schema multipas explicite d'ordre 2 est
+\begin{equation}
+ u_i^{n+1} = u_i^n + \Delta t\left(\frac{3}{2}F_i^n - \frac{1}{2}F_i^{n-1}\right),
+\end{equation}
+ou $F_i^n = D\Delta_h u_i^n + f(u_i^n)$.
+
+Ce schema offre un meilleur ordre temporel (2 vs 4) mais reste conditionnellement
+stable. Il requiert deux niveaux temporels, d'ou une initialisation generale par Euler
+ou par RK4.
+
+\section{Methode 4 : Adams-Moulton d'ordre 2}
+La methode d'Adams-Moulton est une methode multipas implicite construite par integration
+de la formule d'interpolation de Lagrange. Pour l'equation
+\begin{equation}
+\frac{du}{dt} = G(u),
+\end{equation}
+on derive le schema a partir de l'integration exacte
+\begin{equation}
+u(t^{n+1})=u(t^n) + \int_{t^n}^{t^{n+1}} G(u(t)) dt.
+\end{equation}
+En utilisant une formule de quadrature (trapeze) sur cet integrale, on obtient
+\begin{equation}
+u^{n+1} = u^n + \frac{\Delta t}{2}\left(G(u^n)+G(u^{n+1})\right).
+\end{equation}
+Appliquer a notre equation de reaction-diffusion discretisee spatialement:
+\begin{equation}
+u_i^{n+1} = u_i^n + \frac{\Delta t}{2}\left(F_i^n + F_i^{n+1}\right),
+\end{equation}
+ou $F_i^n = D\Delta_h u_i^n + f(u_i^n)$.
+
+Cette formulation peut aussi s'ecrire de maniere explicite en reorganisant:
+\begin{equation}
+u_i^{n+1} - \frac{\Delta t}{2}D\Delta_h u_i^{n+1} = u_i^n + \frac{\Delta t}{2}\left(D\Delta_h u_i^n + f(u_i^n) + f(u_i^{n+1})\right).
+\end{equation}
+Sous forme matricielle, cela devient
+\begin{equation}
+\left(I - \frac{\Delta t}{2}A\right)U^{n+1} = U^n + \frac{\Delta t}{2}\left(AU^n + F(U^n) + F(U^{n+1})\right),
+\end{equation}
+ou $A$ est la matrice du Laplacien discret.
+
+La resolution requiert une iteration implicite (Newton ou point fixe) puisque $F(U^{n+1})$
+est non lineaire.
+
+Avantages:
+\begin{itemize}[leftmargin=1.5em]
+  \item ordre 2 en temps (meilleur qu'Euler implicite);
+  \item stabilite inconditionnelle pour la partie diffusive;
+  \item traitement equilibre entre les niveaux $n$ et $n+1$.
+\end{itemize}
+
+Cette methode est particulierement efficace pour les problemes raides ou lorsqu'on souhaite
+des pas de temps plus grands sans perte de precision.
+
+\section{Tableau recapitulatif}
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lccccl@{}}
+\toprule
+Methode & Pas & Type & Ordre temps & Cout par pas & Stabilite \\
+\midrule
+Runge-Kutta 4 & 1 & explicite & 4 & moyen & conditionnelle \\
+Euler implicite & 1 & implicite & 1 & moyen & inconditionnelle \\
+Adams-Bashforth 2 & multi & explicite & 2 & faible & conditionnelle \\
+Adams-Moulton 2 & multi & implicite & 2 & moyen & inconditionnelle \\
+\bottomrule
+\end{tabular}
+\caption{Comparaison synthetique des quatre schemas consideres.}
+\end{table}
+
+\chapter{Partie III -- Etude de stabilite}
+L'analyse de stabilite des schemas numeriques est cruciale pour garantir la fiabilite
+des simulations \cite{Hundsdorfer1995,Rannacher1984}.
+
+\section{Stabilite de l'equation linearisee}
+On linearise autour d'un equilibre $u^*$ en posant $u=u^*+v$ avec $|v|\ll 1$.
+On obtient
+\begin{equation}
+\partial_t v = D\partial_{xx}v + f'(u^*)v.
+\end{equation}
+Si l'on cherche une solution de Fourier
+\begin{equation}
+ v(x,t)=\rho(t)e^{ikx},
+\end{equation}
+alors
+\begin{equation}
+ \rho'(t)=\left(f'(u^*)-Dk^2\right)\rho(t).
+\end{equation}
+Le taux de croissance est donc
+\begin{equation}
+ \lambda(k)=f'(u^*)-Dk^2.
+\end{equation}
+On en deduit:
+\begin{itemize}[leftmargin=1.5em]
+  \item stabilite locale de $u^*=0$ et $u^*=1$;
+  \item instabilite de $u^*=a$;
+  \item attenuation des modes haute frequence par la diffusion.
+\end{itemize}
+
+\section{Analyse de Von Neumann -- Runge-Kutta d'ordre 4}
+L'analyse de stabilite de Von Neumann \cite{Trefethen1996,LeVeque2007} est une technique
+standard pour etudier les schemas explicites.
+On considere la partie lineaire diffusee
+\begin{equation}
+ u_t = D u_{xx}.
+\end{equation}
+En posant
+\begin{equation}
+ u_i^n = \rho^n e^{\mathrm{i}k x_i},
+\end{equation}
+le schema de Runge-Kutta d'ordre 4 donne
+\begin{equation}
+ \rho = 1 - 4\mu\sin^2\left(\frac{k\Delta x}{2}\right),
+\end{equation}
+ou
+\begin{equation}
+ \mu = \frac{D\Delta t}{(\Delta x)^2}.
+\end{equation}
+La condition $|\rho|\le 1$ pour tout $k$ impose
+\begin{equation}
+ \mu \le \frac{1}{2},
+\end{equation}
+soit la condition CFL diffusive classique:
+\begin{equation}
+ \Delta t \le \frac{(\Delta x)^2}{2D}.
+\end{equation}
+
+\section{Analyse de Von Neumann -- Euler implicite}
+Pour Euler implicite sur le meme probleme lineaire, on obtient
+\begin{equation}
+ \rho = \frac{1}{1+4\mu\sin^2\left(\frac{k\Delta x}{2}\right)}.
+\end{equation}
+Comme le denominateur est toujours strictement positif, on a automatiquement
+\begin{equation}
+ |\rho|\le 1 \qquad \forall \Delta t>0.
+\end{equation}
+Le schema est donc inconditionnellement stable pour la diffusion lineaire.
+
+\section{Extension a AB2 et Adams-Moulton}
+Pour AB2, le polynome caracteristique montre un domaine de stabilite limite. Le schema
+reste donc conditionne par le maillage et par la raideur du probleme.
+
+Pour Adams-Moulton d'ordre 2, la methode possede d'excellentes proprietes de stabilite.
+Analyse de Von Neumann sur la partie diffusive (voir section suivante) montre que le schema
+est A-stable et offre une error de troncature d'ordre $O((\Delta t)^3)$ pour la partie temporelle.
+En pratique, c'est un schema beaucoup plus robuste qu'AB2, avec un bon compromis entre
+précision et cout de calcul.
+
+\section{Stabilite non lineaire}
+Le terme de reaction influe sur le seuil de stabilite globale.
+Autour d'une solution lisse, une estimation pratique est
+\begin{equation}
+ \Delta t \leq \min\left(\frac{(\Delta x)^2}{2D},\; \frac{1}{\max |f'(u)|}\right).
+\end{equation}
+Cette borne n'est pas toujours stricte mathematiquement, mais elle constitue un bon critere
+pratique pour les calculs explicites.
+
+\section{Ordre de convergence numerique}
+L'ordre de convergence se mesure en comparant une solution numerique a une solution de
+reference sur plusieurs maillages:
+\begin{equation}
+ E_h = \|u_h-u_{ref}\|.
+\end{equation}
+En representation log-log, on s'attend a une pente proche de 4 pour RK4,
+2 pour AB2, 1 pour Euler implicite et 2 pour Adams-Moulton, tant que l'erreur spatiale ne domine pas.
+
+\chapter{Partie IV -- Simulations et resultats}
+\section{Parametres de simulation}
+On peut utiliser par exemple:
+\begin{equation}
+ L=60, \qquad D=1, \qquad a=0.25, \qquad T=25.
+\end{equation}
+La condition initiale choisie est un front lisse centre en $x_0$ avec largeur $\sigma$.
+Ce choix permet de visualiser clairement la propagation et d'extraire la vitesse du front.
+
+\section{Comparaison des quatre schemas}
+Les simulations doivent comparer:
+\begin{itemize}[leftmargin=1.5em]
+  \item le profil final $u(x,T)$;
+  \item l'evolution temporelle du front $x_{0.5}(t)$;
+  \item la vitesse numerique observee;
+  \item la stabilite du profil et l'absence d'oscillations parasites.
+\end{itemize}
+
+RK4 offre un excellent compromis entre precision et cout. Euler implicite et Adams-Moulton sont mieux adaptes
+aux pas de temps plus grands. AB2 constitue une option intermediaire avec ordre 2, moins precis que RK4
+mais moins couteux et restant explicite.
+
+\section{Etude de sensibilite}
+La variation de $a$ controle le sens de propagation du front:
+\begin{itemize}[leftmargin=1.5em]
+  \item $a<1/2$: propagation de 1 vers 0;
+  \item $a>1/2$: propagation de 0 vers 1;
+  \item $a=1/2$: front quasi stationnaire.
+\end{itemize}
+
+La variation de $D$ modifie la largeur de l'interface:
+\begin{itemize}[leftmargin=1.5em]
+  \item grand $D$: front plus large et plus lisse;
+  \item petit $D$: front plus abrupt et plus raide numeriquement.
+\end{itemize}
+
+\section{Cout computationnel}
+Le cout d'un calcul depend principalement du nombre de pas de temps requis.
+Les methodes explicites sont peu couteuses par pas mais demandent souvent un pas de temps
+beaucoup plus petit.
+Les schemas implicites sont plus chers a chaque iteration, mais peuvent reduire fortement
+le nombre total d'iterations.
+
+\section{Figures a produire}
+Pour une presentation complete, on prevoit les figures suivantes:
+\begin{itemize}[leftmargin=1.5em]
+  \item profil initial;
+  \item profils a plusieurs instants;
+  \item suivi du front $u=0.5$;
+  \item comparaison des vitesses numeriques et theoriques;
+  \item courbes de convergence;
+  \item energie discrete en fonction du temps.
+\end{itemize}
+
+\chapter{Code MATLAB}
+% CORRECTION : lstinputlisting remplace par un listing inline
+% car le fichier nagumo_simulation.m n'est pas disponible separement.
+\begin{lstlisting}[style=matlabstyle,caption={Script MATLAB principal : nagumo\_simulation.m}]
+%% nagumo_simulation.m
+% Simulation de l'equation de Nagumo 1D par quatre schemas
+% u_t = D*u_xx + u*(1-u)*(u-a),  x in [0,L], t in [0,T]
+% Conditions de Neumann homogenes aux deux bords.
+
+clear; close all; clc;
+
+%% -- Parametres physiques --
+L  = 60;      % longueur du domaine
+D  = 1;       % coefficient de diffusion
+a  = 0.25;    % parametre de seuil (0 < a < 1)
+T  = 25;      % temps final
+
+%% -- Discretisation spatiale --
+N  = 200;                        % nombre d'intervalles
+dx = L / N;                      % pas d'espace
+x  = (0:N)' * dx;                % vecteur des noeuds (N+1 points)
+
+%% -- Condition initiale : front lisse centre en x0 --
+x0    = L / 2;
+sigma = 2;
+u0    = 1 ./ (1 + exp((x - x0) / sigma));
+
+%% -- Terme de reaction --
+f    = @(u) u .* (1 - u) .* (u - a);
+fpri = @(u) -3*u.^2 + 2*(1+a)*u - a;   % derivee de f
+
+%% -- Matrice Laplacien discret avec Neumann (points fantomes) --
+e   = ones(N+1, 1);
+A   = spdiags([e, -2*e, e], -1:1, N+1, N+1);
+% Conditions de Neumann : u_{-1}=u_1 et u_{N+1}=u_{N-1}
+A(1,   2)   = 2;
+A(end, end-1) = 2;
+A = (D / dx^2) * A;
+
+%% -- Pas de temps : condition CFL pour les schemas explicites --
+mu_max = 0.45;                        % < 0.5 pour la securite
+dt_exp = mu_max * dx^2 / D;
+Nt_exp = ceil(T / dt_exp);
+dt_exp = T / Nt_exp;
+
+% Pas de temps plus grand autorise pour les schemas implicites
+dt_imp = 10 * dt_exp;
+Nt_imp = ceil(T / dt_imp);
+dt_imp = T / Nt_imp;
+
+fprintf('dx = %.4f | dt_exp = %.6f (Nt=%d) | dt_imp = %.4f (Nt=%d)\n',...
+        dx, dt_exp, Nt_exp, dt_imp, Nt_imp);
+
+%% =========================================================
+%%  SCHEMA 1 : Runge-Kutta d'ordre 4
+%% =========================================================
+u = u0;
+front_RK4 = zeros(Nt_exp, 1);
+for n = 1:Nt_exp
+    % Etape 1
+    K1 = A*u + f(u);
+    % Etape 2
+    K2 = A*(u + 0.5*dt_exp*K1) + f(u + 0.5*dt_exp*K1);
+    % Etape 3
+    K3 = A*(u + 0.5*dt_exp*K2) + f(u + 0.5*dt_exp*K2);
+    % Etape 4
+    K4 = A*(u + dt_exp*K3) + f(u + dt_exp*K3);
+    % Mise a jour
+    u = u + (dt_exp/6.0) * (K1 + 2*K2 + 2*K3 + K4);
+    
+    % Position du front (isovaleur 0.5)
+    idx = find(u(1:end-1) >= 0.5 & u(2:end) < 0.5, 1, 'first');
+    if ~isempty(idx)
+        front_RK4(n) = x(idx) + dx * (0.5 - u(idx)) / (u(idx+1) - u(idx));
+    end
+end
+u_RK4 = u;
+
+%% =========================================================
+%%  SCHEMA 2 : Euler implicite (semi-implicite : f explicite)
+%% =========================================================
+I = speye(N+1);
+u = u0;
+front_EI = zeros(Nt_imp, 1);
+for n = 1:Nt_imp
+    % (I - dt*A)*u^{n+1} = u^n + dt*f(u^n)
+    rhs = u + dt_imp * f(u);
+    u   = (I - dt_imp * A) \ rhs;
+    idx = find(u(1:end-1) >= 0.5 & u(2:end) < 0.5, 1, 'first');
+    if ~isempty(idx)
+        front_EI(n) = x(idx) + dx * (0.5 - u(idx)) / (u(idx+1) - u(idx));
+    end
+end
+u_EI = u;
+
+%% =========================================================
+%%  SCHEMA 3 : Adams-Bashforth 2
+%%  Initialisation par un pas Euler implicite (pour AB2)
+%% =========================================================
+u     = u0;
+Fold  = A*u + f(u);
+u     = u + dt_exp * Fold;          % premier pas Euler
+front_AB2 = zeros(Nt_exp, 1);
+for n = 2:Nt_exp
+    Fnew = A*u + f(u);
+    u    = u + dt_exp * (1.5*Fnew - 0.5*Fold);
+    Fold = Fnew;
+    idx = find(u(1:end-1) >= 0.5 & u(2:end) < 0.5, 1, 'first');
+    if ~isempty(idx)
+        front_AB2(n) = x(idx) + dx * (0.5 - u(idx)) / (u(idx+1) - u(idx));
+    end
+end
+u_AB2 = u;
+
+%% =========================================================
+%%  SCHEMA 4 : Adams-Moulton d'ordre 2 (semi-implicite : f explicite)
+%%  Initialisation par un pas Euler implicite
+%% =========================================================
+u_prev = u0;
+rhs0   = u_prev + dt_imp * f(u_prev);
+u_cur  = (I - dt_imp * A) \ rhs0;   % premier pas Euler implicite
+front_AM2 = zeros(Nt_imp, 1);
+for n = 2:Nt_imp
+    % (3/2*I - dt*A)*u^{n+1} = 2*u^n - 1/2*u^{n-1} + dt*f(u^n)
+    rhs    = 2*u_cur - 0.5*u_prev + dt_imp * f(u_cur);
+    u_new  = (1.5*I - dt_imp * A) \ rhs;
+    u_prev = u_cur;
+    u_cur  = u_new;
+    idx = find(u_cur(1:end-1) >= 0.5 & u_cur(2:end) < 0.5, 1, 'first');
+    if ~isempty(idx)
+        front_AM2(n) = x(idx) + dx*(0.5 - u_cur(idx))/(u_cur(idx+1) - u_cur(idx));
+    end
+end
+u_AM2 = u_cur;
+
+%% =========================================================
+%%  Vitesse theorique
+%% =========================================================
+c_th = sqrt(2*D) * (0.5 - a);
+fprintf('Vitesse theorique : c = %.4f\n', c_th);
+
+%% =========================================================
+%%  Figures
+%% =========================================================
+
+% -- Profils finaux --
+figure;
+plot(x, u0,    'k--',  'LineWidth', 1.2, 'DisplayName', 'CI');
+hold on;
+plot(x, u_RK4, 'b-',   'LineWidth', 1.5, 'DisplayName', 'RK4');
+plot(x, u_EI,  'r-',   'LineWidth', 1.5, 'DisplayName', 'Euler impl.');
+plot(x, u_AB2, 'g-',   'LineWidth', 1.5, 'DisplayName', 'AB2');
+plot(x, u_AM2,'m-',   'LineWidth', 1.5, 'DisplayName', 'Adams-Moulton');
+xlabel('x'); ylabel('u(x,T)');
+title('Profil final u(x,T) -- comparaison des schemas');
+legend('Location', 'best'); grid on;
+
+% -- Suivi du front --
+t_exp = (1:Nt_exp)' * dt_exp;
+t_imp = (1:Nt_imp)' * dt_imp;
+figure;
+plot(t_exp, front_RK4,  'b-',  'LineWidth', 1.5, 'DisplayName', 'RK4'); hold on;
+plot(t_imp, front_EI,   'r-',  'LineWidth', 1.5, 'DisplayName', 'Euler impl.');
+plot(t_exp, front_AB2,  'g.',  'DisplayName', 'AB2');
+plot(t_imp, front_AM2, 'm-',  'LineWidth', 1.5, 'DisplayName', 'Adams-Moulton');
+plot([0 T], [L/2 L/2 + c_th*T], 'k--', 'LineWidth', 1.2, 'DisplayName', ...
+    sprintf('Theorique c=%.3f', c_th));
+xlabel('t'); ylabel('x_{front}');
+title('Position du front au cours du temps');
+legend('Location', 'best'); grid on;
+\end{lstlisting}
+
+\chapter*{Conclusion}
+\addcontentsline{toc}{chapter}{Conclusion}
+L'equation de Nagumo est un excellent modele pour comprendre les fronts bistables \cite{Grindrod1988}.
+L'analyse theorique montre le role du seuil $a$ et explique la vitesse de propagation.
+L'etude numerique met en evidence la difference fondamentale entre les schemas explicites,
+conditionnellement stables, et les schemas implicites, plus robustes.
+
+Du point de vue pratique, RK4 offre un bon compromis entre precision et cout. Euler implicite
+et Adams-Moulton sont preferables pour des simulations plus longues ou plus raides.
+AB2 constitue un compromis interessant lorsque l'on veut conserver un cout faible tout
+en gagnant en ordre temporel.
+
+\chapter*{Annexes}
+\addcontentsline{toc}{chapter}{Annexes}
+\section*{Annexe A -- Formules utiles}
+\begin{align*}
+ f(u)   &= u(1-u)(u-a), \\
+ f'(u)  &= -3u^2+2(1+a)u-a, \\
+ c_{\mathrm{th}} &= \sqrt{2D}\left(\frac12-a\right).
+\end{align*}
+
+\section*{Annexe B -- Ordre des methodes}
+\begin{longtable}{@{}p{4cm}p{2cm}p{2cm}p{2cm}p{4cm}@{}}
+\toprule
+Methode & Type & Ordre & Stabilite & Remarque \\
+\midrule
+Runge-Kutta 4 & explicite & 4 & conditionnelle & bon compromis precision/cout \\
+Euler implicite & implicite & 1 & inconditionnelle & robuste pour la diffusion \\
+AB2 & explicite & 2 & conditionnelle & necessite deux pas \\
+Adams-Moulton & implicite & 2 & inconditionnelle & bon choix pour problemes raides \\
+\bottomrule
+\end{longtable}
+
+\section*{Annexe C -- Compilation du document}
+Pour compiler ce document (sans fichier \texttt{.bib} externe), utiliser simplement:
+\begin{verbatim}
+pdflatex nagumo_modeling.tex
+pdflatex nagumo_modeling.tex
+\end{verbatim}
+Les references sont integrees directement dans le source.
+
+%% =========================================================
+%%  BIBLIOGRAPHIE inline (remplace nagumo.bib + natbib)
+%% =========================================================
+\begin{thebibliography}{99}
+
+\bibitem{Nagumo1962}
+J.~Nagumo, S.~Arimoto, S.~Yoshizawa,
+\textit{An active pulse transmission line simulating nerve axon},
+Proc. IRE, 50(10):2061--2070, 1962.
+
+\bibitem{MurrayMathematicalBiology}
+J.~D.~Murray,
+\textit{Mathematical Biology I: An Introduction},
+3rd ed., Springer, 2002.
+
+\bibitem{Volpert2000}
+A.~Volpert, V.~Volpert, V.~Volpert,
+\textit{Traveling Wave Solutions of Parabolic Systems},
+American Mathematical Society, 1994.
+
+\bibitem{Aronson1978}
+D.~G.~Aronson, H.~F.~Weinberger,
+\textit{Multidimensional nonlinear diffusion arising in population genetics},
+Adv. Math., 30(1):33--76, 1978.
+
+\bibitem{PeletierSerafini2012}
+L.~A.~Peletier, W.~C.~Troy,
+\textit{Spatial Patterns: Higher Order Models in Physics and Mechanics},
+Birkh\"auser, 2001.
+
+\bibitem{EvansGariepy2015}
+L.~C.~Evans,
+\textit{Partial Differential Equations},
+2nd ed., American Mathematical Society, 2010.
+
+\bibitem{FifeMcLeod1977}
+P.~C.~Fife, J.~B.~McLeod,
+\textit{The approach of solutions of nonlinear diffusion equations to
+travelling front solutions},
+Arch. Rational Mech. Anal., 65(4):335--361, 1977.
+
+\bibitem{Strikwerda2004}
+J.~C.~Strikwerda,
+\textit{Finite Difference Schemes and Partial Differential Equations},
+2nd ed., SIAM, 2004.
+
+\bibitem{LeVeque2007}
+R.~J.~LeVeque,
+\textit{Finite Difference Methods for Ordinary and Partial Differential Equations},
+SIAM, 2007.
+
+\bibitem{Ascher2008}
+U.~M.~Ascher, L.~R.~Petzold,
+\textit{Computer Methods for Ordinary Differential Equations and
+Differential-Algebraic Equations},
+SIAM, 1998.
+
+\bibitem{Trefethen1996}
+L.~N.~Trefethen,
+\textit{Finite Difference and Spectral Methods for Ordinary and
+Partial Differential Equations},
+Cornell University, 1996.
+
+\bibitem{Hundsdorfer1995}
+W.~Hundsdorfer, J.~G.~Verwer,
+\textit{Numerical Solution of Time-Dependent Advection-Diffusion-Reaction Equations},
+Springer, 2003.
+
+\bibitem{Rannacher1984}
+R.~Rannacher,
+\textit{Finite element solution of diffusion problems with irregular data},
+Numer. Math., 43(2):309--327, 1984.
+
+\bibitem{Grindrod1988}
+P.~Grindrod,
+\textit{The Theory and Applications of Reaction-Diffusion Equations},
+2nd ed., Oxford University Press, 1996.
+
+\end{thebibliography}
+
+\end{document}

@@ -1,0 +1,50 @@
+Pourquoi passe-t-on de la formulation forte à la formulation faible, et que perd-on ou gagne-t-on mathématiquement 
+
+Qu'est-ce que l'espace H¹(Ω) et pourquoi la MEF travaille dans H¹₀(Ω) plutôt que dans C²(Ω) 
+
+Montrer pas à pas comment on obtient la formulation variationnelle de l'équation de Poisson -Δu = f avec conditions de Dirichlet homogènes.
+
+ pourquoi le théorème de Lax-Milgram garantit-il l'existence et l'unicité pour le problème de Poisson .?
+
+Comment la méthode de Galerkin transforme-t-elle le problème variationnel infini-dimensionnel en un système linéaire fini AU = F 
+
+
+
+
+Pourquoi passer de la formulation forte à la faible ?
+
+Qu'est-ce que H¹(Ω) et H¹₀(Ω) ?
+
+
+
+Qu'est-ce que la discrétisation et pourquoi est-elle nécessaire pour résoudre des problèmes en mathématiques, en informatique et en ingénierie ?
+
+Quel est le principe fondamental de la Méthode des Éléments Finis (MEF) lorsqu'il s'agit de traiter un domaine complexe ?
+
+Quels sont les domaines d'application concrets de cette méthode (par exemple, en mécanique des structures ou en transfert de chaleur) ?
+
+Quels sont les avantages majeurs de la MEF par rapport aux méthodes classiques, notamment pour traiter des géométries complexes ?
+
+Fondements Théoriques
+
+Quelle est la différence entre une formulation forte (équations différentielles classiques) et une formulation faible (variationnelle) ?
+
+Pourquoi "affaiblit-on" la régularité des solutions recherchées dans la formulation faible ?
+
+Que représente physiquement une forme bilinéaire a(u,v) dans un problème d'ingénierie (par exemple, en lien avec le principe des travaux virtuels) ?
+
+Mise en Œuvre Pratique
+
+Qu'est-ce qu'un maillage et comment le découpage d'un domaine en "éléments finis" influence-t-il la précision du calcul ?
+
+À quoi servent les "fonctions de forme" (ou fonctions de base) sur chaque élément du maillage ?
+
+En quoi consiste l'étape d'assemblage pour passer des contributions locales de chaque élément à une solution globale pour tout le système ?
+
+Prérequis et Objectifs
+
+Quelles connaissances préalables en analyse numérique et méthodes mathématiques pour l'ingénieur sont nécessaires pour suivre ce module ?
+
+Quelles compétences (savoir-faire) l'étudiant doit-il maîtriser à la fin de ce cours, notamment en termes de modélisation et de simulation numérique ?
+
+
